@@ -1,52 +1,47 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import * as XLSX from 'xlsx';
 
 export default function AdminPage() {
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleExcelUpload = async (e) => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      setLoading(true);
-      const bstr = evt.target.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+  }, []);
 
-      const { error } = await supabase.from('documents').upsert(data, { onConflict: 'file_url' });
-      
-      if (error) alert("حدث خطأ: " + error.message);
-      else alert("تم رفع البيانات وتحديثها بنجاح!");
-      setLoading(false);
-    };
-    reader.readAsBinaryString(file);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) alert("خطأ في الدخول: " + error.message);
+    else window.location.reload();
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-6 text-right" dir="rtl">
-      <h1 className="text-2xl font-bold text-blue-900 mb-6">لوحة الإدارة</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border-2 border-dashed border-blue-200 flex flex-col items-center justify-center">
-          <p className="mb-4 font-medium">رفع من ملف إكسيل (Bulk Upload)</p>
-          <input type="file" id="excel" hidden onChange={handleExcelUpload} accept=".xlsx, .csv" />
-          <label htmlFor="excel" className="bg-blue-600 text-white px-6 py-3 rounded-xl cursor-pointer hover:bg-blue-700 transition-all">
-            {loading ? "جاري المعالجة..." : "اختر ملف الإكسيل"}
-          </label>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 font-bold">
-            <h3 className="mb-4 text-blue-800">تنبيهات هامة:</h3>
-            <ul className="text-sm text-gray-600 space-y-2 list-disc pr-4">
-                <li>يجب أن تكون عناوين الأعمدة في الإكسيل (title, file_url, department).</li>
-                <li>رابط الملف (file_url) يمنع تكرار نفس الملف مرتين.</li>
-                <li>الأقسام المتعددة تفصل بينها بعلامة (–).</li>
-            </ul>
-        </div>
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 font-sans" dir="rtl">
+        <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-lg w-96 text-right">
+          <h2 className="text-xl font-bold mb-6 text-center">دخول الإدارة</h2>
+          <input 
+            type="email" placeholder="البريد الإلكتروني" 
+            className="w-full p-2 mb-4 border rounded"
+            onChange={(e) => setEmail(e.target.value)} 
+          />
+          <input 
+            type="password" placeholder="كلمة المرور" 
+            className="w-full p-2 mb-6 border rounded"
+            onChange={(e) => setPassword(e.target.value)} 
+          />
+          <button className="w-full bg-blue-600 text-white py-2 rounded font-bold">دخول</button>
+        </form>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // ... كود رفع الإكسيل الذي أعطيتك إياه سابقاً يوضع هنا ...
 }
