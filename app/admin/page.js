@@ -22,7 +22,7 @@ export default function AdminPage() {
     else window.location.reload();
   };
 
-  const handleExcelUpload = async (e) => {
+const handleExcelUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -32,11 +32,25 @@ export default function AdminPage() {
         const bstr = evt.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
+        const rawData = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
 
-        const { error } = await supabase.from('documents').upsert(data, { onConflict: 'file_url' });
+        // --- إضافة منطق حذف التكرار هنا ---
+        const cleanData = [];
+        const seenUrls = new Set();
+
+        for (const item of rawData) {
+          // نتأكد أن الرابط موجود وغير فارغ
+          if (item.file_url && !seenUrls.has(item.file_url)) {
+            cleanData.push(item);
+            seenUrls.add(item.file_url);
+          }
+        }
+        // ---------------------------------
+
+        const { error } = await supabase.from('documents').upsert(cleanData, { onConflict: 'file_url' });
+        
         if (error) throw error;
-        alert("تم رفع " + data.length + " ملف بنجاح!");
+        alert("تم رفع " + cleanData.length + " ملف بنجاح (تم استبعاد الروابط المكررة إن وجدت)");
       } catch (err) {
         alert("خطأ أثناء الرفع: " + err.message);
       }
